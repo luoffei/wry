@@ -48,7 +48,7 @@ use webview2_com::Microsoft::Web::WebView2::Win32::ICoreWebView2Controller;
 #[cfg(target_os = "windows")]
 use windows::{Win32::Foundation::HWND, Win32::UI::WindowsAndMessaging::DestroyWindow};
 
-use std::{path::PathBuf, rc::Rc};
+use std::{path::PathBuf, rc::Rc, sync::Arc};
 
 pub use url::Url;
 
@@ -191,6 +191,19 @@ pub struct WebViewAttributes {
   /// allow to navigate and false is not.
   pub new_window_req_handler: Option<Box<dyn Fn(String) -> bool>>,
 
+  /// Set a certificate error handler to handle webview request server certificate error.
+  ///
+  /// The closure provides an `i32` parameter as the certificate error code and a `String` parameter as the certificate,
+  /// and returns the `i32` to determine the action. `0` means execution is allowed, and the result will be cached and
+  /// will not be triggered again.
+  ///
+  /// ## Platform-specific
+  ///
+  /// This configuration only impacts windows.
+  /// [Documentation](https://learn.microsoft.com/en-us/microsoft-edge/webview2/reference/win32/icorewebview2_14)
+  #[cfg(target_os = "windows")]
+  pub server_certificate_error_handler: Option<Arc<dyn Fn(i32, String) -> i32>>,
+
   /// Enables clipboard access for the page rendered on **Linux** and **Windows**.
   ///
   /// macOS doesn't provide such method and is always enabled by default. But you still need to add menu
@@ -242,6 +255,8 @@ impl Default for WebViewAttributes {
       download_started_handler: None,
       download_completed_handler: None,
       new_window_req_handler: None,
+      #[cfg(target_os = "windows")]
+      server_certificate_error_handler: None,
       clipboard: false,
       #[cfg(debug_assertions)]
       devtools: true,
@@ -401,6 +416,16 @@ impl<'a> WebViewBuilder<'a> {
     F: Fn(&Window, String) + 'static,
   {
     self.webview.ipc_handler = Some(Box::new(handler));
+    self
+  }
+
+  /// Set the server certificate error handler.
+  #[cfg(target_os = "windows")]
+  pub fn with_server_certificate_error_handler(
+    mut self,
+    handler: Arc<dyn Fn(i32, String) -> i32 + Send + Sync>,
+  ) -> Self {
+    self.webview.server_certificate_error_handler = Some(handler);
     self
   }
 
