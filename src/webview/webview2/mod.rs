@@ -488,6 +488,35 @@ window.addEventListener('mousemove', (e) => window.chrome.webview.postMessage('_
       }
     }
 
+    let server_certificate_error_handler = attributes.server_certificate_error_handler.take();
+
+    unsafe {
+      let webview2_14: ICoreWebView2_14 =
+        webview.cast().map_err(webview2_com::Error::WindowsError)?;
+      webview2_14
+        .add_ServerCertificateErrorDetected(
+          &ServerCertificateErrorDetectedEventHandler::create(Box::new(move |_, args| {
+            if let Some(server_certificate_error_handler) = &server_certificate_error_handler {
+              if let Some(args) = args {
+                let mut error_status = COREWEBVIEW2_WEB_ERROR_STATUS_UNKNOWN;
+                args.ErrorStatus(&mut error_status)?;
+  
+                let mut cert = PWSTR::null();
+                let certificate = args.ServerCertificate()?;
+                certificate.ToPemEncoding(&mut cert)?;
+                let cert = cert.to_string().unwrap();
+                
+                let status = server_certificate_error_handler(error_status.0, cert);
+                args.SetAction(COREWEBVIEW2_SERVER_CERTIFICATE_ERROR_ACTION(status))?;
+              }
+            }
+            Ok(())
+          })),
+          &mut token,
+        )
+        .map_err(webview2_com::Error::WindowsError)?;
+    }
+
     let mut custom_protocol_names = HashSet::new();
     if !attributes.custom_protocols.is_empty() {
       for (name, _) in &attributes.custom_protocols {
