@@ -203,7 +203,21 @@ pub struct WebViewAttributes {
   /// This configuration only impacts windows.
   /// [Documentation](https://learn.microsoft.com/en-us/microsoft-edge/webview2/reference/win32/icorewebview2_14)
   #[cfg(target_os = "windows")]
-  pub server_certificate_error_handler: Option<Arc<dyn Fn(i32, String) -> i32>>,
+  pub server_certificate_error_handler: Option<std::sync::Arc<dyn Fn(i32, String) -> i32>>,
+
+  /// Set the TLS errors policy of manager as policy
+  ///
+  /// ## Platform-specific
+  ///
+  /// **Windows / Android**: Not supported.
+  #[cfg(any(
+    target_os = "linux",
+    target_os = "dragonfly",
+    target_os = "freebsd",
+    target_os = "openbsd",
+    target_os = "netbsd"
+  ))]
+  pub tls_errors_policy: webkit2gtk::TLSErrorsPolicy,
 
   /// Enables clipboard access for the page rendered on **Linux** and **Windows**.
   ///
@@ -258,6 +272,14 @@ impl Default for WebViewAttributes {
       new_window_req_handler: None,
       #[cfg(target_os = "windows")]
       server_certificate_error_handler: None,
+      #[cfg(any(
+        target_os = "linux",
+        target_os = "dragonfly",
+        target_os = "freebsd",
+        target_os = "openbsd",
+        target_os = "netbsd"
+      ))]
+      tls_errors_policy: webkit2gtk::TLSErrorsPolicy::Fail,
       clipboard: false,
       #[cfg(debug_assertions)]
       devtools: true,
@@ -433,9 +455,22 @@ impl<'a> WebViewBuilder<'a> {
   #[cfg(target_os = "windows")]
   pub fn with_server_certificate_error_handler(
     mut self,
-    handler: Arc<dyn Fn(i32, String) -> i32 + Send + Sync>,
+    handler: std::sync::Arc<dyn Fn(i32, String) -> i32 + Send + Sync>,
   ) -> Self {
     self.webview.server_certificate_error_handler = Some(handler);
+    self
+  }
+
+  /// Set tls error handling policy.
+  #[cfg(any(
+    target_os = "linux",
+    target_os = "dragonfly",
+    target_os = "freebsd",
+    target_os = "openbsd",
+    target_os = "netbsd"
+  ))]
+  pub fn with_tls_errors_policy(mut self, policy: webkit2gtk::TLSErrorsPolicy) -> Self {
+    self.webview.tls_errors_policy = policy;
     self
   }
 
