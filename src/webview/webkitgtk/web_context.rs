@@ -20,8 +20,9 @@ use std::{
 };
 use url::Url;
 use webkit2gtk::{
-  traits::*, ApplicationInfo, CookiePersistentStorage, LoadEvent, UserContentManager, WebContext,
-  WebContextBuilder, WebView, WebsiteDataManagerBuilder,
+  traits::*, ApplicationInfo, CookiePersistentStorage, LoadEvent, TLSErrorsPolicy,
+  UserContentManager, WebContext, WebContextBuilder, WebContextExt as OtherWebContextExt, WebView,
+  WebsiteDataManagerBuilder,
 };
 
 #[derive(Debug)]
@@ -135,6 +136,9 @@ pub trait WebContextExt {
   /// **Note:** `libwebkit2gtk` only allows 1 automation context at a time.
   fn allows_automation(&self) -> bool;
 
+  /// Set tls error handling policy.
+  fn set_tls_errors_policy(&mut self, policy: TLSErrorsPolicy) -> crate::Result<()>;
+
   fn register_automation(&mut self, webview: WebView);
 
   fn register_download_handler(
@@ -186,6 +190,12 @@ impl WebContextExt for super::WebContext {
 
   fn allows_automation(&self) -> bool {
     self.os.automation
+  }
+
+  fn set_tls_errors_policy(&mut self, policy: TLSErrorsPolicy) -> crate::Result<()> {
+    let context = &self.os.context;
+    context.set_tls_errors_policy(policy);
+    Ok(())
   }
 
   fn register_automation(&mut self, webview: WebView) {
