@@ -392,6 +392,34 @@ window.addEventListener('mousemove', (e) => window.chrome.webview.postMessage('_
       }
     }
 
+    // Ignore tls error
+    if attributes.ignore_tls_error {
+      unsafe {
+        let webview2_14: ICoreWebView2_14 =
+          webview.cast().map_err(webview2_com::Error::WindowsError)?;
+        webview2_14
+          .add_ServerCertificateErrorDetected(
+            &ServerCertificateErrorDetectedEventHandler::create(Box::new(move |_, args| {
+              if let Some(args) = args {
+                // let mut error_status = COREWEBVIEW2_WEB_ERROR_STATUS_UNKNOWN;
+                // args.ErrorStatus(&mut error_status)?;
+
+                // let mut cert = PWSTR::null();
+                // let certificate = args.ServerCertificate()?;
+                // certificate.ToPemEncoding(&mut cert)?;
+                // let cert = cert.to_string().unwrap();
+
+                // let status = server_certificate_error_handler(error_status.0, cert);
+                args.SetAction(COREWEBVIEW2_SERVER_CERTIFICATE_ERROR_ACTION_ALWAYS_ALLOW)?;
+              }
+              Ok(())
+            })),
+            &mut token,
+          )
+          .map_err(webview2_com::Error::WindowsError)?;
+      }
+    }
+
     if attributes.download_started_handler.is_some()
       || attributes.download_completed_handler.is_some()
     {

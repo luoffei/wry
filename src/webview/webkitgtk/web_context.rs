@@ -21,8 +21,8 @@ use std::{
 };
 use url::Url;
 use webkit2gtk::{
-  traits::*, ApplicationInfo, CookiePersistentStorage, LoadEvent, URIRequest, UserContentManager,
-  WebContext, WebContextBuilder, WebView, WebsiteDataManagerBuilder,
+  traits::*, ApplicationInfo, CookiePersistentStorage, LoadEvent, TLSErrorsPolicy, URIRequest,
+  UserContentManager, WebContext, WebContextBuilder, WebView, WebsiteDataManagerBuilder,
 };
 
 #[derive(Debug)]
@@ -138,6 +138,9 @@ pub trait WebContextExt {
 
   fn register_automation(&mut self, webview: WebView);
 
+  /// Set tls error handling policy.
+  fn set_tls_errors_policy(&mut self, policy: TLSErrorsPolicy) -> crate::Result<()>;
+
   fn register_download_handler(
     &mut self,
     download_started_callback: Option<Box<dyn FnMut(String, &mut PathBuf) -> bool>>,
@@ -207,6 +210,12 @@ impl WebContextExt for super::WebContext {
         auto.connect_create_web_view(None, move |_| webview.clone());
       });
     }
+  }
+
+  fn set_tls_errors_policy(&mut self, policy: TLSErrorsPolicy) -> crate::Result<()> {
+    let context = &mut self.os.context;
+    <WebContext as webkit2gtk::WebContextExt>::set_tls_errors_policy(context, policy);
+    Ok(())
   }
 
   fn register_download_handler(

@@ -116,6 +116,10 @@ impl InnerWebView {
       });
     }
 
+    if attributes.ignore_tls_error {
+      _ = web_context.set_tls_errors_policy(webkit2gtk::TLSErrorsPolicy::Ignore);
+    }
+
     webview.add_events(
       EventMask::POINTER_MOTION_MASK
         | EventMask::BUTTON1_MOTION_MASK

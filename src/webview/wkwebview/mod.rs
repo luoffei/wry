@@ -64,6 +64,7 @@ use http::{
 
 const IPC_MESSAGE_HANDLER_NAME: &str = "ipc";
 const ACCEPT_FIRST_MOUSE: &str = "accept_first_mouse";
+const NSURL_AUTHENTICATION_METHOD_SERVER_TRUST: &str = "NSURLAuthenticationMethodServerTrust";
 
 pub(crate) struct InnerWebView {
   pub webview: id,
@@ -523,6 +524,47 @@ impl InnerWebView {
         }
       }
 
+      extern "C" fn web_view_did_receive_authentication_challenge(
+        _this: &Object,
+        _cmd: Sel,
+        _web_view: id,
+        challenge: id,
+        handler: id,
+      ) {
+        let protection_space: id = unsafe { msg_send![challenge, protectionSpace] };
+        let authentication_method: id =
+          unsafe { msg_send![protection_space, authenticationMethod] };
+
+        let is_server_trust = unsafe {
+          <id as cocoa::foundation::NSString>::isEqualToString(
+            authentication_method,
+            NSURL_AUTHENTICATION_METHOD_SERVER_TRUST,
+          )
+        };
+
+        if is_server_trust {
+          let handler = handler as *mut block::Block<(NSInteger, id), c_void>;
+
+          let previous_failure_count: NSInteger =
+            unsafe { msg_send![challenge, previousFailureCount] };
+          if previous_failure_count == 0 {
+            let disposition: NSInteger = 0; // NSURLSessionAuthChallengeUseCredential
+
+            let server_trust: id = unsafe { msg_send![protection_space, serverTrust] };
+            let credential: id =
+              unsafe { msg_send![class!(NSURLCredential), credentialForTrust: server_trust] };
+            let _: () = unsafe {
+              (*handler).call((disposition, credential));
+            };
+          } else {
+            let disposition: NSInteger = 2; // NSURLSessionAuthChallengeCancelAuthenticationChallenge
+            let _: () = unsafe {
+              (*handler).call((disposition, nil));
+            };
+          }
+        }
+      }
+
       let pending_scripts = Arc::new(Mutex::new(Some(Vec::new())));
 
       let navigation_delegate_cls = match ClassDecl::new("WryNavigationDelegate", class!(NSObject))
@@ -543,6 +585,13 @@ impl InnerWebView {
             sel!(webView:didCommitNavigation:),
             did_commit_navigation as extern "C" fn(&Object, Sel, id, id),
           );
+          if attributes.ignore_tls_error {
+            cls.add_method(
+              sel!(webView:didReceiveAuthenticationChallenge:completionHandler:),
+              web_view_did_receive_authentication_challenge
+                as extern "C" fn(&Object, Sel, id, id, id),
+            );
+          }
           add_download_methods(&mut cls);
           cls.register()
         }
